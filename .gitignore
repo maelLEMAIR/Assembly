@@ -1,12 +1,25 @@
-CMakeLists.txt.user
+# CMake build directories
+out/
+
+# IDE directories
+.idea/
+.vs/
+.vscode/
+
+# Compiled files
+*.o
+*.obj
+*.exe
+*.out
+*.app
+
+# CMake cache
 CMakeCache.txt
-CMakeFiles
-CMakeScripts
-Testing
-Makefile
+CMakeFiles/
 cmake_install.cmake
-install_manifest.txt
-compile_commands.json
-CTestTestfile.cmake
-_deps
-CMakeUserPresets.json
+Makefile
+
+# Generated files
+*.user
+*.suo
+*.sln.docstates
