@@ -83,6 +83,50 @@ outer_done:
 done:
     ret
 asm_sortAnArray ENDP
+
+asm_CompCharsArrays PROC
+    cmp     rdx, r9
+    jne     notequal
+    xor     r10, r10
+
+COMP_LOOP:
+    cmp     r10, rdx
+    jge     equalArrays
+
+    movzx   eax, byte ptr [rcx + r10]
+    movzx   r11d, byte ptr [r8 + r10]
+    cmp     eax, r11d
+    jne     notEqual
+
+    inc     r10
+    jmp     COMP_LOOP
+    
+equalArrays:
+    mov     rax, 1
+    ret
+
+notEqual: 
+    xor     rax, rax
+    ret
+    
+asm_CompCharsArrays ENDP
+
+asm_sumFloat PROC
+    addss xmm0, xmm1
+    ret
+asm_sumFloat ENDP
+
+asm_move PROC
+    mov rax, [rcx]
+    add rax, [rcx + 8 * 2]
+    mov [rcx], rax
+    mov rax, [rcx + 8]
+    add rax, [rcx + 8 * 3]
+    mov [rcx + 8], rax
+    ret
+
+asm_move ENDP
+
 END
 
 
