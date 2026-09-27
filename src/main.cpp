@@ -1,10 +1,12 @@
 #include <iostream>
 #include <vector>
 #include <conio.h>
-#include <algorithm>   // FIX: nécessaire pour std::find (utilisé sans qualification avant)
+#include <algorithm>
 #include <cstdint>
-#include <cstdlib>     // FIX: nécessaire pour system("cls")
-#include <Windows.h>   // FIX: pour Sleep() -- _sleep() n'existe pas tel quel / mauvais header
+#include <cstdlib>
+#include <Windows.h>
+
+#include "vec4.hpp"
 
 static int failures = 0;
 #define CHECK(expr) do { if (!(expr)) { std::printf("ECHEC: %s\n", #expr); ++failures; } } while (0)
@@ -23,28 +25,31 @@ static int failures = 0;
 
 static int64_t neighbours[4][2] = { {-1, 0}, {1, 0}, {0, -1}, {0, 1} };
 
+
+
 struct Entity
 {
-    int64_t x, y, vx, vy;
+    vec2 pos = vec2(0.0f, 0.0f);             
+    vec2 vel = vec2(0.0f, 0.0f);       
     int64_t hpMax, hp;
     int64_t attack;
 };
 
-struct Door; // FIX: déclaration anticipée, car Grid a besoin de connaître Door avant sa définition complète
+struct Door;
 
 struct Grid
 {
     std::vector<std::vector<char>> grid;
-    std::vector<Door*> doors;      // FIX: chaque grille a désormais ses propres portes
-    std::vector<Entity*> entities; // FIX: et ses propres monstres
+    std::vector<Door*> doors;   
+    std::vector<Entity*> entities;
 };
 
 struct Door
 {
-    int32_t x, y;              // position de la porte dans SA grille (lue par asm_checkDoor)
-    int32_t spawnX, spawnY;    // FIX: case d'arrivée dans la grille de destination (pas sur la porte elle-même)
-    Door* next;                 // FIX: la porte correspondante de l'autre côté
-    Grid* grid;                  // la grille à laquelle cette porte appartient
+    vec2 pos = vec2(0.0f, 0.0f);             
+    int32_t spawnX, spawnY;
+    Door* next;            
+    Grid* grid;           
 };
 
 extern "C" {
@@ -58,6 +63,7 @@ extern "C" {
     int64_t asm_isDead(Entity* entity);
     int64_t asm_checkDoor(Door** doors, int64_t count, Entity* pPlayer, int64_t stride);
     void asm_move(Entity* a);
+    void asm_movef(Entity* a);
     void asm_attack(Entity* player, Entity* monster);
 }
 
@@ -88,11 +94,11 @@ void PrintInfo(Entity* pPlayer)
 
 void PrintGrid(Entity* pPlayer)
 {
-    for (int i = 0; i < (int)currentGrid->grid.size(); i++)
+    for (int i = 0; i < (int64_t)currentGrid->grid.size(); i++)
     {
-        for (int j = 0; j < (int)currentGrid->grid[i].size(); j++)
+        for (int j = 0; j < (int64_t)currentGrid->grid[i].size(); j++)
         {
-            if (pPlayer->x == j && pPlayer->y == i) std::cout << " " << GREEN << "X" << DEFAULT << " ";
+            if (pPlayer->pos.x() == j && pPlayer->pos.y() == i) std::cout << " " << GREEN << "X" << DEFAULT << " ";
             else if (currentGrid->grid[i][j] == '-') std::cout << BLUEBG << "   " << DEFAULTBG;
             else if (currentGrid->grid[i][j] == 'M') std::cout << " " << RED << "M" << DEFAULT << " ";
             else if (currentGrid->grid[i][j] == 'D') std::cout << YELLOWBG << "   " << DEFAULTBG;
@@ -108,7 +114,7 @@ void AttackNeighbours(Entity* pPlayer)
 
     for (int i = 0; i < 4; i++)
     {
-        int64_t pos[] = { pPlayer->x, pPlayer->y };
+        int64_t pos[] = { (int64_t)pPlayer->pos.x(), (int64_t)pPlayer->pos.y() };
         pos[0] += neighbours[i][0];
         pos[1] += neighbours[i][1];
         for (Entity* ent : currentGrid->entities)
@@ -138,7 +144,7 @@ void CheckHealthPoint()
         Entity* ent = *it;
         if (asm_isDead(ent) == 1)
         {
-            currentGrid->grid[ent->y][ent->x] = ' ';
+            currentGrid->grid[(int64_t)ent->pos.y()][(int64_t)ent->pos.x()] = ' ';
             it = currentGrid->entities.erase(it);
         }
         else
@@ -162,40 +168,39 @@ void CheckDoor(Entity* pPlayer)
         if (door->next != nullptr)
         {
             currentGrid = door->next->grid;
-            pPlayer->x = door->next->spawnX;
-            pPlayer->y = door->next->spawnY;
+            pPlayer->pos = door->next->pos;
         }
     }
 }
 
 bool HandleInput(Entity* pPlayer)
 {
-    pPlayer->vx = 0;
-    pPlayer->vy = 0;
+    pPlayer->vel = vec2(0, 0);
     std::cout << YELLOW << "ZQSD " << DEFAULT << " TO MOV & " << YELLOW << "A " << DEFAULT << "TO ATTACK" << '\n';
     char ch = _getch();
-    int64_t pos[] = { pPlayer->x, pPlayer->y };
+    int64_t pos[] = { (int64_t)pPlayer->pos.x(), (int64_t)pPlayer->pos.y() };
     switch (ch)
     {
     case LEFT:
-        pos[0] = pPlayer->x - 1;
-        if (pPlayer->x > 0 && asm_checkCell(&currentGrid->grid, pos, '-', sizeof(std::vector<char>)) == 0 &&
-            asm_checkCell(&currentGrid->grid, pos, 'M', sizeof(std::vector<char>)) == 0) pPlayer->vx = -1;
+        pos[0] = pPlayer->pos.x() - 1;
+        if (pPlayer->pos.x() > 0 && asm_checkCell(&currentGrid->grid, pos, '-', sizeof(std::vector<char>)) == 0 &&
+            asm_checkCell(&currentGrid->grid, pos, 'M', sizeof(std::vector<char>)) == 0) pPlayer->vel = vec2(-1.0f, 0.0f);
+        
         break;
     case RIGHT:
-        pos[0] = pPlayer->x + 1;
-        if (pPlayer->x < (int64_t)currentGrid->grid[pPlayer->y].size() - 1 && asm_checkCell(&currentGrid->grid, pos, '-', sizeof(std::vector<char>)) == 0 &&
-            asm_checkCell(&currentGrid->grid, pos, 'M', sizeof(std::vector<char>)) == 0) pPlayer->vx = 1;
+        pos[0] = pPlayer->pos.x() + 1;
+        if (pPlayer->pos.x() < (int64_t)currentGrid->grid[(int64_t)pPlayer->pos.y()].size() - 1 && asm_checkCell(&currentGrid->grid, pos, '-', sizeof(std::vector<char>)) == 0 &&
+            asm_checkCell(&currentGrid->grid, pos, 'M', sizeof(std::vector<char>)) == 0) pPlayer->vel = vec2(1, 0);
         break;
     case UP:
-        pos[1] = pPlayer->y - 1;
-        if (pPlayer->y > 0 && asm_checkCell(&currentGrid->grid, pos, '-', sizeof(std::vector<char>)) == 0 &&
-            asm_checkCell(&currentGrid->grid, pos, 'M', sizeof(std::vector<char>)) == 0) pPlayer->vy = -1;
+        pos[1] = pPlayer->pos.y() - 1;
+        if (pPlayer->pos.y() > 0 && asm_checkCell(&currentGrid->grid, pos, '-', sizeof(std::vector<char>)) == 0 &&
+            asm_checkCell(&currentGrid->grid, pos, 'M', sizeof(std::vector<char>)) == 0) pPlayer->vel = vec2(0, -1);
         break;
     case DOWN:
-        pos[1] = pPlayer->y + 1;
-        if (pPlayer->y < (int64_t)currentGrid->grid.size() - 1 && asm_checkCell(&currentGrid->grid, pos, '-', sizeof(std::vector<char>)) == 0 &&
-            asm_checkCell(&currentGrid->grid, pos, 'M', sizeof(std::vector<char>)) == 0) pPlayer->vy = 1;
+        pos[1] = pPlayer->pos.y() + 1;
+        if (pPlayer->pos.y() < (int64_t)currentGrid->grid.size() - 1 && asm_checkCell(&currentGrid->grid, pos, '-', sizeof(std::vector<char>)) == 0 &&
+            asm_checkCell(&currentGrid->grid, pos, 'M', sizeof(std::vector<char>)) == 0) pPlayer->vel = vec2(0, 1);
         break;
     case ENTER:
         AttackNeighbours(pPlayer);
@@ -205,7 +210,12 @@ bool HandleInput(Entity* pPlayer)
     default:
         return true;
     }
-    asm_move(pPlayer);
+    pPlayer->vel.print("VELOCITY : ");
+    pPlayer->pos.print("POSITION : ");
+    Sleep(500);
+    asm_movef(pPlayer);
+    pPlayer->pos.print("POSITION : ");
+    Sleep(500);
     CheckDoor(pPlayer);
     PrintGrid(pPlayer);
     return true;
@@ -216,7 +226,7 @@ Grid* CreateGrid(std::vector<std::vector<char>> layout, Entity* pPlayer)
     Grid* g = new Grid();
     g->grid = layout;
 
-    for (int i = 0; i < (int)g->grid.size(); i++)
+    for (int i = 0; i < (int64_t)g->grid.size(); i++)
     {
         int32_t width = (int32_t)g->grid[i].size();
         for (int j = 0; j < width; j++)
@@ -225,18 +235,17 @@ Grid* CreateGrid(std::vector<std::vector<char>> layout, Entity* pPlayer)
             if (c == 'D')
             {
                 int32_t spawnX = (j == 0) ? 1 : (j == width - 1 ? width - 2 : j);
-                Door* door = new Door{ j, i, spawnX, i, nullptr, g };
+                Door* door = new Door{ vec2(j, i), spawnX, i, nullptr, g };
                 g->doors.push_back(door);
             }
             else if (c == 'M')
             {
-                Entity* monster = new Entity{ j, i, 0, 0, 5, 5, 1 };
+                Entity* monster = new Entity{ vec2(j, i), vec2(0, 0),5, 5, 1 };
                 g->entities.push_back(monster);
             }
             else if (c == 'X' && pPlayer != nullptr)
             {
-                pPlayer->x = j;
-                pPlayer->y = i;
+                pPlayer->pos = vec2(j, i);
                 g->grid[i][j] = ' ';
             }
         }
@@ -248,7 +257,7 @@ int main()
 {
     bool isOpen = true;
 
-    Entity* vivienSavage = new Entity{ 0, 0, 0, 0, 10, 8, 2 };
+    Entity* vivienSavage = new Entity{ vec2(0, 0), vec2(0, 0), 10, 8, 2 };
 
     std::vector<std::vector<char>> layout1 = {
         {'-', '-', '-', '-', '-', '-', '-', '-', '-', '-'},

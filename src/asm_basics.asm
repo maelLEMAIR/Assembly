@@ -117,6 +117,8 @@ asm_sumFloat PROC
 asm_sumFloat ENDP
 
 asm_move PROC
+    ; rcx = Entity
+    ; int
     mov rax, [rcx]
     add rax, [rcx + 8 * 2]
     mov [rcx], rax
@@ -126,6 +128,20 @@ asm_move PROC
     ret
 
 asm_move ENDP
+
+asm_movef PROC
+    ; rcx = Entity
+    ; float
+    movss xmm0, DWORD PTR [rcx]
+    addss xmm0, DWORD PTR [rcx + 8]
+    movss DWORD PTR [rcx], xmm0
+
+    movss xmm0, DWORD PTR [rcx + 4]
+    addss xmm0, DWORD PTR [rcx + 12]
+    movss DWORD PTR [rcx + 4], xmm0
+
+    ret
+asm_movef ENDP
 
 asm_checkCell PROC
     ; rcx = grid, rdx = pos, r8b = c, r9 = stride
