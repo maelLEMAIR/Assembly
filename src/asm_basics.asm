@@ -117,6 +117,7 @@ asm_sumFloat PROC
 asm_sumFloat ENDP
 
 asm_move PROC
+    ; rcx = entity
     mov rax, [rcx]
     add rax, [rcx + 8 * 2]
     mov [rcx], rax
@@ -240,4 +241,16 @@ done:
     ret
 asm_checkDoor ENDP
 
+asm_heal PROC
+    ; rcx = player, rdx = numberOfHeal
+    mov rax, [rcx + 8*5]   ; PV actuels
+    add rax, rdx
+    mov r8, [rcx + 8*4]    ; PV MAX
+    cmp rax, r8
+    jle done
+    mov rax, r8           
+done:
+    mov [rcx + 8*5], rax  
+    ret
+asm_heal ENDP
 END
