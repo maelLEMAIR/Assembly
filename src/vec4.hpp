@@ -1,8 +1,9 @@
-﻿#ifndef VEC4_HPP
-#define VEC4_HPP
+﻿#ifndef VEC2_HPP
+#define VEC2_HPP
 
 #include <cstdio>
-#include <xmmintrin.h>
+#include <cstdint>
+#include <smmintrin.h>   // SSE4.1 (inclut SSE2)
 
 #if defined(_MSC_VER)
   #define VECCALL __vectorcall
@@ -13,28 +14,27 @@
 class alignas(16) vec2
 {
 public:
-    __m128 m;
-    
-    vec2() : m(_mm_setzero_ps()) { }
-    explicit vec2(__m128 v) : m(v) {}
-    ~vec2() = default;
-    vec2(float x, float y) : m(_mm_setr_ps(x, y, 0.0f, 0.0f)) {}
-    
-    float x() const { return _mm_cvtss_f32(m); }
-    float y() const { return _mm_cvtss_f32(_mm_shuffle_ps(m, m, _MM_SHUFFLE(1,1,1,1))); }
-    
-    friend vec2 VECCALL operator+(vec2 a, vec2 b) { return vec2(_mm_add_ps(a.m, b.m)); }
-    friend vec2 VECCALL operator-(vec2 a, vec2 b) { return vec2(_mm_sub_ps(a.m, b.m)); } 
-    friend vec2 VECCALL operator*(vec2 a, vec2 b) { return vec2(_mm_mul_ps(a.m, b.m)); }
-    friend vec2 VECCALL operator*(vec2 a, float s) 
+    __m128i m;
+
+    vec2() : m(_mm_setzero_si128()) {}
+    explicit vec2(__m128i v) : m(v) {}
+    vec2(int32_t x, int32_t y) : m(_mm_setr_epi32(x, y, 0, 0)) {}
+
+    int32_t x() const { return _mm_cvtsi128_si32(m); }
+    int32_t y() const { return _mm_extract_epi32(m, 1); }
+
+    friend vec2 VECCALL operator+(vec2 a, vec2 b) { return vec2(_mm_add_epi32(a.m, b.m)); }
+    friend vec2 VECCALL operator-(vec2 a, vec2 b) { return vec2(_mm_sub_epi32(a.m, b.m)); }
+    friend vec2 VECCALL operator*(vec2 a, vec2 b) { return vec2(_mm_mullo_epi32(a.m, b.m)); }
+    friend vec2 VECCALL operator*(vec2 a, int32_t s) { return vec2(_mm_mullo_epi32(a.m, _mm_set1_epi32(s))); }
+
+    vec2& operator+=(vec2 o) { m = _mm_add_epi32(m, o.m); return *this; }
+    vec2& operator-=(vec2 o) { m = _mm_sub_epi32(m, o.m); return *this; }
+    vec2& operator*=(int32_t s) { m = _mm_mullo_epi32(m, _mm_set1_epi32(s)); return *this; }
+
+    void print(const char* label = "") const
     {
-        __m128 sv = _mm_setr_ps(s, s, 0.0f, 0.0f);                    
-        return vec2(_mm_mul_ps(a.m, sv));
+        printf("%s(%d, %d)\n", label, (int)x(), (int)y());
     }
-    
-    vec2& operator+=(vec2 o) { m = _mm_add_ps(m, o.m); return *this; }
-    vec2& operator*=(float s) { *this = *this * s; return *this; }
-    
-    void print(const char* label = "") const { printf("%s(%.3f, %.3f)\n", label, x(), y()); }
 };
 #endif

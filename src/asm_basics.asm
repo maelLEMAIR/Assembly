@@ -29,57 +29,43 @@ sum_done:
 asm_maxInAnArray ENDP
 
 asm_sortAnArray PROC
-    
-    test    rdx, rdx
-    jz      done
+    ; rcx = tableau int64, rdx = n
     cmp     rdx, 1
-    jle     done            
+    jle     done
 
-    xor     r9, r9          
+    xor     r8, r8                  ; i
 
 outer_loop:
-    
-    mov     rax, rdx
-    dec     rax             
-    cmp     r9, rax
-    jge     outer_done
+    lea     rax, [rdx - 1]
+    cmp     r8, rax
+    jge     done
 
-  
-    mov     r10, r9                    
-    mov     r11, [rcx + r9 * 8] 
-
-   
-    mov     r12, r9
-    inc     r12
+    mov     r10, r8                 ; indice du min
+    mov     r11, [rcx + r8 * 8]     ; valeur du min
+    lea     r9, [r8 + 1]            ; j
 
 inner_loop:
-    cmp     r12, rdx
+    cmp     r9, rdx
     jge     inner_done
-
-    mov     r13, [rcx + r12 * 8]       
-    cmp     r13, r11
+    mov     rax, [rcx + r9 * 8]
+    cmp     rax, r11
     jge     skip_update
-    mov     r11, r13               
-    mov     r10, r12                   
+    mov     r11, rax
+    mov     r10, r9
 skip_update:
-    inc     r12                        
+    inc     r9
     jmp     inner_loop
 
 inner_done:
-    
-    cmp     r10, r9
+    cmp     r10, r8
     je      no_swap
-
-    mov     rax, [rcx + r9 * 8]        
-    mov     rbx, [rcx + r10 * 8]    
-    mov     [rcx + r9 * 8], rbx     
-    mov     [rcx + r10 * 8], rax    
-
+    mov     rax, [rcx + r8 * 8]     ; ancien a[i]
+    mov     [rcx + r10 * 8], rax    ; a[min] = ancien a[i]
+    mov     [rcx + r8 * 8], r11     ; a[i]   = min
 no_swap:
-    inc     r9                         
+    inc     r8
     jmp     outer_loop
 
-outer_done:
 done:
     ret
 asm_sortAnArray ENDP
@@ -117,154 +103,112 @@ asm_sumFloat PROC
 asm_sumFloat ENDP
 
 asm_move PROC
-    ; rcx = entity
-    mov rax, [rcx]
-    add rax, [rcx + 8 * 2]
-    mov [rcx], rax
-    mov rax, [rcx + 8]
-    add rax, [rcx + 8 * 3]
-    mov [rcx + 8], rax
+    ; rcx = entity : pos += vel (2 x int32)
+    movq    xmm0, qword ptr [rcx]
+    movq    xmm1, qword ptr [rcx + 16]
+    paddd   xmm0, xmm1
+    movq    qword ptr [rcx], xmm0
     ret
-
 asm_move ENDP
 
-asm_movef PROC
-    ; rcx = Entity
-    ; float
-    movss xmm0, DWORD PTR [rcx]
-    addss xmm0, DWORD PTR [rcx + 8]
-    movss DWORD PTR [rcx], xmm0
-
-    movss xmm0, DWORD PTR [rcx + 4]
-    addss xmm0, DWORD PTR [rcx + 12]
-    movss DWORD PTR [rcx + 4], xmm0
-
-    ret
-asm_movef ENDP
-
 asm_checkCell PROC
-    ; rcx = grid, rdx = pos, r8b = c, r9 = stride
+    ; rcx = grid, rdx = pos (int32[2]), r8b = c, r9 = stride
     mov     r10, r9
-    sub     r10, 24                 
-    mov     r11, [rdx]             
-    mov     rdx, [rdx + 8]          
-    mov     rax, [rcx + r10]       
-    imul    rdx, r9                
-    add     rax, rdx          
+    sub     r10, 24
+    movsxd  r11, dword ptr [rdx]        ; x
+    movsxd  rdx, dword ptr [rdx + 4]    ; y
+    mov     rax, [rcx + r10]
+    imul    rdx, r9
+    add     rax, rdx
     mov     rax, [rax + r10]
     movzx   r10, byte ptr [rax + r11]
     cmp     r10b, r8b
     jne     not_equal
     mov     rax, 1
     jmp     done
-
 not_equal:
-    mov     rax, 0
-
+    xor     eax, eax
 done:
     ret
 asm_checkCell ENDP
 
 asm_attack PROC
     ; rcx = player, rdx = monster
-
-    mov rax, [rcx + 8 * 5]  ;   <--- PV joueur
-    mov r8, [rcx + 8 * 6]   ;   <--- AT joueur
-    
-    mov r9, [rdx + 8 * 5]   ;   <--- PV monster
-    mov r10, [rdx + 8 * 6]  ;   <--- AT monster
-
-    sub r9, r8
-    sub rax, r10
-
-    mov [rcx + 8 * 5], rax
-    mov [rdx + 8 * 5], r9
+    mov     eax,  [rcx + 36]    ; PV joueur
+    mov     r8d,  [rcx + 40]    ; AT joueur
+    mov     r9d,  [rdx + 36]    ; PV monstre
+    mov     r10d, [rdx + 40]    ; AT monstre
+    sub     r9d, r8d
+    sub     eax, r10d
+    mov     [rcx + 36], eax
+    mov     [rdx + 36], r9d
     ret
-
 asm_attack ENDP
 
 asm_getEntity PROC
-    ; rcx = entity, rdx = pos
-    mov rax, [rcx]
-    mov r8, [rcx + 8]
-    
-    mov r9, [rdx]
-    mov r10, [rdx + 8]
-
-    cmp rax, r9
-    jne not_equal
-    cmp r8, r10
-    jne not_equal
-    mov rax, 1 
-    jmp done
-
+    ; rcx = entity, rdx = pos (int32[2])
+    mov     eax, [rcx]
+    mov     r8d, [rcx + 4]
+    cmp     eax, [rdx]
+    jne     not_equal
+    cmp     r8d, [rdx + 4]
+    jne     not_equal
+    mov     eax, 1
+    ret
 not_equal:
-    mov rax, 0
-
-done:
+    xor     eax, eax
     ret
 asm_getEntity ENDP
 
 asm_isDead PROC
-    ; rcx = entity
-    mov rax, [rcx + 8 * 5]
-    cmp rax, 0
-    jg  alive              
-    mov rax, 1           
-    jmp done
-
+    cmp     dword ptr [rcx + 36], 0
+    jg      alive
+    mov     eax, 1
+    ret
 alive:
-    xor rax, rax
-
-done:
+    xor     eax, eax
     ret
 asm_isDead ENDP
 
 asm_checkDoor PROC
-    ; rcx = doors (Door**), rdx = count, r8 = pPlayer, r9 = stride
-
-    mov r10, [r8]        
-    mov r11, [r8 + 8]     
-
-    xor rax, rax         
+    ; rcx = Door**, edx = count, r8 = Entity*, r9 = stride
+    mov     r10d, [r8]          ; player x (int32)
+    mov     r11d, [r8 + 4]      ; player y (int32)
+    xor     eax, eax          
 
 COMP_loop:
-    cmp rax, rdx
-    jae not_found
+    cmp     eax, edx            
+    jae     not_found
 
-    mov r8, rax
-    imul r8, r9   
-    mov r8, [rcx + r8]
+    mov     r8d, eax
+    imul    r8, r9              
+    mov     r8, [rcx + r8]      
 
-    cmp r10d, [r8]      
-    jne not_equal
-    cmp r11d, [r8 + 4]
-    je equal
+    cmp     r10d, [r8]          
+    jne     next
+    cmp     r11d, [r8 + 4]    
+    je      done                
 
-not_equal:
-    inc rax
-    jmp COMP_loop
-
-equal:
-    jmp done             
+next:
+    inc     eax
+    jmp     COMP_loop
 
 not_found:
-    mov rax, -1
-
+    mov     eax, -1
 done:
     ret
 asm_checkDoor ENDP
 
 asm_heal PROC
-    ; rcx = player, rdx = numberOfHeal
-    mov rax, [rcx + 8*5]   ; PV actuels
-    add rax, rdx
-    mov r8, [rcx + 8*4]    ; PV MAX
-    cmp rax, r8
-    jle done
-    mov rax, r8           
+    ; rcx = player, edx = numberOfHeal
+    mov     eax, [rcx + 36]
+    add     eax, edx
+    mov     r8d, [rcx + 32]     ; PV max
+    cmp     eax, r8d
+    jle     done
+    mov     eax, r8d
 done:
-    mov [rcx + 8*5], rax  
+    mov     [rcx + 36], eax
     ret
 asm_heal ENDP
 END
