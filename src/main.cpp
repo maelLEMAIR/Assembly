@@ -65,6 +65,7 @@ extern "C" {
     void asm_move(Entity* a);
     void asm_movef(Entity* a);
     void asm_attack(Entity* player, Entity* monster);
+    void asm_heal(Entity* player, int64_t numberOfHeal);
 }
 
 enum MOVEMENT
@@ -89,7 +90,7 @@ void PrintInfo(Entity* pPlayer)
         else
             std::cout << DEFAULTBG << "  ";
     }
-    std::cout << "]" << "\n\n";
+    std::cout << DEFAULTBG << "]   " << pPlayer->hp << " / " << pPlayer->hpMax << "\n\n";
 }
 
 void PrintGrid(Entity* pPlayer)
@@ -102,6 +103,7 @@ void PrintGrid(Entity* pPlayer)
             else if (currentGrid->grid[i][j] == '-') std::cout << BLUEBG << "   " << DEFAULTBG;
             else if (currentGrid->grid[i][j] == 'M') std::cout << " " << RED << "M" << DEFAULT << " ";
             else if (currentGrid->grid[i][j] == 'D') std::cout << YELLOWBG << "   " << DEFAULTBG;
+            else if (currentGrid->grid[i][j] == '+') std::cout << GREEN << " + " << DEFAULT;
             else std::cout << "   " << DEFAULTBG;
         }
         std::cout << '\n';
@@ -173,6 +175,16 @@ void CheckDoor(Entity* pPlayer)
     }
 }
 
+void CheckHealBoost(Entity* pPlayer)
+{
+    int64_t pos[] = { pPlayer->x, pPlayer->y };
+    if ( asm_checkCell(&currentGrid->grid, pos, '+', sizeof(std::vector<char>)) )
+    {
+        asm_heal(pPlayer, 3);
+        currentGrid->grid[pos[1]][pos[0]] = ' ';
+    }
+}
+
 bool HandleInput(Entity* pPlayer)
 {
     pPlayer->vel = vec2(0, 0);
@@ -210,12 +222,8 @@ bool HandleInput(Entity* pPlayer)
     default:
         return true;
     }
-    pPlayer->vel.print("VELOCITY : ");
-    pPlayer->pos.print("POSITION : ");
-    Sleep(500);
-    asm_movef(pPlayer);
-    pPlayer->pos.print("POSITION : ");
-    Sleep(500);
+    asm_move(pPlayer);
+    CheckHealBoost(pPlayer);
     CheckDoor(pPlayer);
     PrintGrid(pPlayer);
     return true;
@@ -267,14 +275,14 @@ int main()
         {'D', 'X', ' ', ' ', ' ', ' ', ' ', ' ', ' ', 'D'},
         {'-', ' ', ' ', ' ', '-', ' ', ' ', ' ', ' ', '-'},
         {'-', ' ', ' ', ' ', '-', ' ', ' ', ' ', ' ', '-'},
-        {'-', ' ', ' ', ' ', '-', '-', ' ', ' ', ' ', '-'},
+        {'-', ' ', ' ', ' ', '-', '-', '+', ' ', ' ', '-'},
         {'-', ' ', ' ', '-', '-', '-', '-', ' ', '-', '-'},
         {'-', '-', '-', '-', '-', '-', '-', '-', '-', '-'}
     };
 
     std::vector<std::vector<char>> layout2 = {
         {'-', '-', '-', '-', '-', '-', '-', '-', '-', '-'},
-        {'-', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '-'},
+        {'-', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '+', '-'},
         {'-', ' ', ' ', 'M', ' ', ' ', ' ', ' ', ' ', '-'},
         {'-', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '-'},
         {'D', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', 'D'},
@@ -287,13 +295,13 @@ int main()
 
     std::vector<std::vector<char>> layout3 = {
         {'-', '-', '-', '-', '-', '-', '-', '-', '-', '-'},
-        {'-', '-', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '-'},
+        {'-', '-', ' ', ' ', ' ', ' ', ' ', ' ', '+', '-'},
         {'-', '-', 'M', ' ', ' ', ' ', 'M', ' ', ' ', '-'},
         {'-', '-', '-', '-', '-', '-', ' ', ' ', ' ', '-'},
         {'D', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', 'D'},
         {'-', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '-'},
         {'-', ' ', ' ', ' ', ' ', '-', ' ', ' ', ' ', '-'},
-        {'-', ' ', ' ', '-', '-', '-', '-', ' ', ' ', '-'},
+        {'-', ' ', '+', '-', '-', '-', '-', ' ', ' ', '-'},
         {'-', '-', '-', '-', '-', '-', '-', ' ', ' ', '-'},
         {'-', '-', '-', '-', '-', '-', '-', '-', '-', '-'}
     };
